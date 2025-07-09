@@ -1,0 +1,220 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace MantoProxy.Handlers
+{
+    class ConnectionHandler
+    {
+        private readonly TcpClient Client;
+
+        private readonly NetworkStream Stream;
+
+        private readonly StreamReader Reader;
+
+        private string FirstLine = String.Empty;
+
+        private string[] Tokens = [];
+
+        private readonly string RemoteIP;
+
+        private readonly string MacAddress;
+
+        private string? AuthHeader;
+
+        private List<string> Lines = new List<string>();
+
+        ConnectionHandler(TcpClient client)
+        {
+            Client = client;
+            Stream = Client.GetStream();
+            #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+            #pragma warning disable CS8602 // Dereference of a possibly null reference.
+            RemoteIP = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+            MacAddress = MacHandler.FromIP(RemoteIP);
+
+            Reader = new StreamReader(Stream);
+            GetLines();
+            CheckAuthHeader();
+        }
+
+        public void GetLines()
+        {
+            Lines.Clear();
+            string? line;
+
+            while (!String.IsNullOrEmpty(line = Reader.ReadLine()))
+            {
+                Lines.Add(line);
+            }
+        }
+
+        public void CheckAuthHeader()
+        {
+            foreach (var line in Lines)
+            {
+                if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AuthHeader = line;
+                        return;
+                    }
+            }
+        }
+
+        public static void Handle(TcpClient client)
+        {
+            var handler = new ConnectionHandler(client);
+
+            try
+            {
+                handler.Run();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERRO] {ex.Message}");
+            }
+            finally
+            {
+                handler.CloseClient();
+            }
+        }
+
+        private void Run()
+        {
+            // if (String.IsNullOrEmpty(AuthHeader))
+            // {
+            //     Console.WriteLine("No Auth Header");
+            //     SendAuthRequiredResponse();
+            //     return;
+            // }
+            // if (!AuthHandler.HasPermission(AuthHeader))
+            // {
+            //     Console.WriteLine("Not allowed");
+            //     SendAuthRequiredResponse();
+            //     return;
+            // }
+
+            FirstLine = Lines[0];
+            if (String.IsNullOrEmpty(FirstLine)) return;
+
+            if (!NetworkPermissionHandler.HasPermission(MacAddress))
+            {
+                SendUnauthorizedResponse();
+                return;
+            }
+
+            Tokens = FirstLine.Split(' ');
+            if (Tokens[0].Equals("CONNECT", StringComparison.CurrentCultureIgnoreCase))
+            {
+                HandleConnect();
+                return;
+            }
+
+            HandleHTTPMethods();
+        }
+
+        private void SendAuthRequiredResponse()
+        {
+            string response =
+                "HTTP/1.1 407 Proxy Authentication Required\r\n" +
+                "Proxy-Authenticate: Basic realm=\"MantoProxy\"\r\n" +
+                "Content-Length: 0\r\n\r\n";
+
+            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+            Stream.Write(responseBytes, 0, responseBytes.Length);
+        }
+
+        private void SendUnauthorizedResponse()
+        {
+            string response =
+                "HTTP/1.1 428 Precondition Required\r\n" +
+                "Content-Length: 0\r\n\r\n";
+
+            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+            Stream.Write(responseBytes, 0, responseBytes.Length);
+        }
+
+        private void HandleHTTPMethods()
+        {
+            string host = String.Empty;
+            var requestBuilder = new StringBuilder();
+
+            foreach (var line in Lines)
+            {
+                requestBuilder.AppendLine(line);
+
+                if (line.StartsWith("Host: "))
+                    host = line[6..].Trim();
+            }
+
+            if (string.IsNullOrEmpty(host))
+            {
+                Console.WriteLine("[ERRO] Host não encontrado.");
+                return;
+            }
+            Console.WriteLine($"[INFO] Requisição HTTP para: {host}");
+
+            TcpClient server = new(host, 80);
+            NetworkStream serverStream = server.GetStream();
+
+            byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
+            serverStream.Write(requestBytes, 0, requestBytes.Length);
+
+            Relay(serverStream, Stream);
+        }
+
+        private void HandleConnect()
+        {
+            string[] hostParts = Tokens[1].Split(':');
+            string host = hostParts[0];
+            int port = int.Parse(hostParts[1]);
+
+            Console.WriteLine($"[INFO] Túnel HTTP para {host}:{port}");
+
+            var server = new TcpClient(host, port);
+            var serverStream = server.GetStream();
+
+            byte[] okResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
+            Stream.Write(okResponse, 0, okResponse.Length);
+
+            // Task clientToServer = Task.Run(() => Relay(Stream, serverStream));
+            // Task serverToClient = Task.Run(() => Relay(serverStream, Stream));
+            // Task.WaitAll(clientToServer, serverToClient);
+
+            var clientThread = new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+
+                Relay(Stream, serverStream);
+            });
+            var serverThread = new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+                Relay(serverStream, Stream);
+            });
+            clientThread.Start();
+            serverThread.Start();
+            clientThread.Join();
+            serverThread.Join();
+        }
+
+        private static void Relay(Stream input, Stream output)
+        {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            try
+            {
+                while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    output.Write(buffer, 0, bytesRead);
+                }
+            }
+            catch { }
+        }
+
+        private void CloseClient()
+        {
+            Client.Close();
+        }
+    }
+}
