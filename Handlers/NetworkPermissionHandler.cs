@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.Net.NetworkInformation;
-using System.Text.RegularExpressions;
 using MantoProxy.Services;
 
 namespace MantoProxy.Handlers

@@ -22,6 +22,11 @@ namespace MantoProxy.Handlers
 
         private string? AuthHeader;
 
+        public string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
+
+        public string HttpUrl => FirstLine.Split(' ').ElementAt(1);
+
+    
         private List<string> Lines = new List<string>();
 
         ConnectionHandler(TcpClient client)
@@ -35,7 +40,6 @@ namespace MantoProxy.Handlers
 
             Reader = new StreamReader(Stream);
             GetLines();
-            CheckAuthHeader();
         }
 
         public void GetLines()
@@ -46,18 +50,16 @@ namespace MantoProxy.Handlers
             while (!String.IsNullOrEmpty(line = Reader.ReadLine()))
             {
                 Lines.Add(line);
+                CheckAuthHeader(line);
             }
         }
 
-        public void CheckAuthHeader()
+        public void CheckAuthHeader(string line)
         {
-            foreach (var line in Lines)
+            if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
             {
-                if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AuthHeader = line;
-                        return;
-                    }
+                AuthHeader = line;
+                return;
             }
         }
 
@@ -160,7 +162,21 @@ namespace MantoProxy.Handlers
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
             serverStream.Write(requestBytes, 0, requestBytes.Length);
 
-            Relay(serverStream, Stream);
+
+            var connThread = new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+                Relay(serverStream, Stream);
+            });
+            var logThread = new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+                LogHandler.LogConnection(MacAddress, HttpMethod, HttpUrl, String.Join('\n', Lines));
+            });
+            connThread.Start();
+            connThread.Join();
+            logThread.Start();
+            logThread.Join();
         }
 
         private void HandleConnect()
@@ -192,10 +208,17 @@ namespace MantoProxy.Handlers
                 Thread.CurrentThread.IsBackground = true;
                 Relay(serverStream, Stream);
             });
+            var logThread = new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+                LogHandler.LogConnection(MacAddress, HttpMethod, HttpUrl, String.Join('\n', Lines));
+            });
             clientThread.Start();
             serverThread.Start();
+            logThread.Start();
             clientThread.Join();
             serverThread.Join();
+            logThread.Join();
         }
 
         private static void Relay(Stream input, Stream output)
@@ -215,6 +238,11 @@ namespace MantoProxy.Handlers
         private void CloseClient()
         {
             Client.Close();
+        }
+
+        private void RegisterConnection()
+        {
+            
         }
     }
 }

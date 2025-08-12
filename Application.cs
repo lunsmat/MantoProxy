@@ -35,7 +35,13 @@ namespace MantoProxy
             {
                 Thread.CurrentThread.IsBackground = true;
 
-                ConnectionHandler.Handle(client);
+                try
+                {
+                    ConnectionHandler.Handle(client);
+                }
+                catch
+                {
+                }
             }).Start();
 
             // Task.Run(() => ConnectionHandler.Handle(client));
