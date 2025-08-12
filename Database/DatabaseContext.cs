@@ -6,6 +6,7 @@ namespace MantoProxy.Database
     class DatabaseContext : DbContext
     {
         public DbSet<Device> Devices { get; set; }
+
         public DbSet<DeviceLog> DeviceLogs { get; set; }
 
 

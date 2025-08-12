@@ -101,7 +101,15 @@ namespace MantoProxy.Handlers
 
             if (!NetworkPermissionHandler.HasPermission(MacAddress))
             {
+                Console.WriteLine("Bloqueado por Falta de Permissão: " + MacAddress + " " + HttpUrl);
                 SendUnauthorizedResponse();
+                return;
+            }
+
+            if (!FirewallHandler.HasPermission(MacAddress, HttpUrl))
+            {
+                Console.WriteLine("Bloqueado pelo Proxy: " + MacAddress + " " + HttpUrl);
+                SendNotAcceptableResponse();
                 return;
             }
 
@@ -120,6 +128,16 @@ namespace MantoProxy.Handlers
             string response =
                 "HTTP/1.1 407 Proxy Authentication Required\r\n" +
                 "Proxy-Authenticate: Basic realm=\"MantoProxy\"\r\n" +
+                "Content-Length: 0\r\n\r\n";
+
+            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+            Stream.Write(responseBytes, 0, responseBytes.Length);
+        }
+
+        private void SendNotAcceptableResponse()
+        {
+            string response =
+                "HTTP/1.1 406 Not Acceptable Required\r\n" +
                 "Content-Length: 0\r\n\r\n";
 
             byte[] responseBytes = Encoding.ASCII.GetBytes(response);
