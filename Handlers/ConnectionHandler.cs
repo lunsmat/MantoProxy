@@ -101,14 +101,14 @@ namespace MantoProxy.Handlers
 
             if (!NetworkPermissionHandler.HasPermission(MacAddress))
             {
-                Console.WriteLine("Bloqueado por Falta de Permissão: " + MacAddress + " " + HttpUrl);
+                // Console.WriteLine("Bloqueado por Falta de Permissão: " + MacAddress + " " + HttpUrl);
                 SendUnauthorizedResponse();
                 return;
             }
 
             if (!FirewallHandler.HasPermission(MacAddress, HttpUrl))
             {
-                Console.WriteLine("Bloqueado pelo Proxy: " + MacAddress + " " + HttpUrl);
+                // Console.WriteLine("Bloqueado pelo Proxy: " + MacAddress + " " + HttpUrl);
                 SendNotAcceptableResponse();
                 return;
             }
@@ -169,10 +169,10 @@ namespace MantoProxy.Handlers
 
             if (string.IsNullOrEmpty(host))
             {
-                Console.WriteLine("[ERRO] Host não encontrado.");
+                // Console.WriteLine("[ERRO] Host não encontrado.");
                 return;
             }
-            Console.WriteLine($"[INFO] Requisição HTTP para: {host}");
+            // Console.WriteLine($"[INFO] Requisição HTTP para: {host}");
 
             TcpClient server = new(host, 80);
             NetworkStream serverStream = server.GetStream();
@@ -203,7 +203,7 @@ namespace MantoProxy.Handlers
             string host = hostParts[0];
             int port = int.Parse(hostParts[1]);
 
-            Console.WriteLine($"[INFO] Túnel HTTP para {host}:{port}");
+            // Console.WriteLine($"[INFO] Túnel HTTP para {host}:{port}");
 
             var server = new TcpClient(host, port);
             var serverStream = server.GetStream();
