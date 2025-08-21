@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -24,7 +25,7 @@ namespace MantoProxy.Handlers
 
         public string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
 
-        public string HttpUrl => FirstLine.Split(' ').ElementAt(1);
+        public string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
 
     
         private List<string> Lines = new List<string>();
