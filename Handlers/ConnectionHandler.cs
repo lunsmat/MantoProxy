@@ -50,8 +50,10 @@ namespace MantoProxy.Handlers
 
             while (!String.IsNullOrEmpty(line = Reader.ReadLine()))
             {
-                Lines.Add(line);
-                CheckAuthHeader(line);
+                line?.Replace("127.0.0.1", RemoteIP);
+                line?.Replace("localhost", RemoteIP);
+                Lines.Add(line ?? String.Empty);
+                CheckAuthHeader(line ?? String.Empty);
             }
         }
 
@@ -74,7 +76,11 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERRO] Erro no Handle: {ex.ToString()}");
+                var error = String.Empty;
+                error += "-------------------------- Request --------------------------\n";
+                error += $"[ERRO] Erro no Handle: {ex.ToString()}\n\n";
+                error += $"Request: {String.Join('\n', handler.Lines)}\n";
+                Console.WriteLine(error);
             }
             finally
             {
@@ -256,11 +262,6 @@ namespace MantoProxy.Handlers
         private void CloseClient()
         {
             Client.Close();
-        }
-
-        private void RegisterConnection()
-        {
-            
         }
     }
 }

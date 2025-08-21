@@ -73,7 +73,7 @@ namespace MantoProxy.Handlers
         {
             try
             {
-                CacheService.Store(CachePrefix + ip, mac, TimeSpan.FromMinutes(15));
+                CacheService.Store(CachePrefix + ip, mac, TimeSpan.FromMinutes(10));
             }
             catch (Exception ex)
             {

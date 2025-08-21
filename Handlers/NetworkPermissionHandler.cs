@@ -68,7 +68,7 @@ namespace MantoProxy.Handlers
         {
             try
             {
-                CacheService.Store(CachePrefix + macAddress, value == true ? 1.ToString() : 0.ToString(), TimeSpan.FromHours(2));
+                CacheService.Store(CachePrefix + macAddress, value == true ? 1.ToString() : 0.ToString(), TimeSpan.FromMinutes(3));
             }
             catch (Exception ex)
             {
