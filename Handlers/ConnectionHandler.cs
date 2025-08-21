@@ -13,8 +13,6 @@ namespace MantoProxy.Handlers
 
         private readonly StreamReader Reader;
 
-        private string FirstLine = String.Empty;
-
         private string[] Tokens = [];
 
         private readonly string RemoteIP;
@@ -23,12 +21,14 @@ namespace MantoProxy.Handlers
 
         private string? AuthHeader;
 
+        private string FirstLine => Lines.FirstOrDefault(String.Empty);
+
         public string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
 
         public string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
 
     
-        private List<string> Lines = new List<string>();
+        private readonly List<string> Lines = [];
 
         ConnectionHandler(TcpClient client)
         {
@@ -97,7 +97,6 @@ namespace MantoProxy.Handlers
             //     return;
             // }
 
-            FirstLine = Lines[0];
             if (String.IsNullOrEmpty(FirstLine)) return;
 
             if (!NetworkPermissionHandler.HasPermission(MacAddress))
