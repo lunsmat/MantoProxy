@@ -84,7 +84,7 @@ namespace MantoProxy.Handlers
 
         private static string GetMacFromARPOutput(string output, string ip)
         {
-            var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var macRegex = MacAddressRegex();
 
             foreach (var line in lines)
