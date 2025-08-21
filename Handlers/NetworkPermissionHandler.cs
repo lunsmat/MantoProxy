@@ -72,7 +72,7 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to set in cache: {ex}");
+                Console.WriteLine($"Failed to set in cache: {ex.ToString()}");
                 return;
             }
         }

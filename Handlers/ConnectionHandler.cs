@@ -73,7 +73,7 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERRO] {ex.Message}");
+                Console.WriteLine($"[ERRO] Erro no Handle: {ex.ToString()}");
             }
             finally
             {

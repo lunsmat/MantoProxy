@@ -48,7 +48,7 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERRO] Falha ao obter MAC: {ex.Message}");
+                Console.WriteLine($"[ERRO] Falha ao obter MAC: {ex.ToString()}");
                 return String.Empty;
             }
         }
@@ -64,7 +64,7 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to get from cache: {ex}");
+                Console.WriteLine($"Failed to get from cache: {ex.ToString()}");
                 return String.Empty;
             }
         }
@@ -77,7 +77,7 @@ namespace MantoProxy.Handlers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to set in cache: {ex}");
+                Console.WriteLine($"Failed to set in cache: {ex.ToString()}");
                 return;
             }
         }
