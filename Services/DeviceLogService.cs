@@ -5,7 +5,7 @@ namespace MantoProxy.Services
 {
     class DeviceLogService
     {
-        public static DeviceLog Create(int deviceId, string httpMethod, string httpUrl, string httpHeaders)
+        public async static Task<DeviceLog> Create(int deviceId, string httpMethod, string httpUrl, string httpHeaders)
         {
             var context = new DatabaseContext();
             
@@ -20,8 +20,8 @@ namespace MantoProxy.Services
                 UpdatedAt = DateTime.UtcNow,
             };
 
-            context.DeviceLogs.Add(deviceLog);
-            context.SaveChanges();
+            await context.DeviceLogs.AddAsync(deviceLog);
+            await context.SaveChangesAsync();
 
             return deviceLog;
         }

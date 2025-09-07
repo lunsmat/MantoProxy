@@ -5,19 +5,26 @@ using MantoProxy.Services;
 
 namespace MantoProxy
 {
-    class Application(IPAddress iPAddress, int port)
+    class Application
     {
-        private readonly IPAddress IPAddress = iPAddress;
+        private readonly IPAddress IPAddress;
 
-        private readonly int ListenPort = port;
+        private readonly int ListenPort;
 
-        private readonly TcpListener TcpListener = new TcpListener(iPAddress, port);
+        private readonly TcpListener TcpListener;
+
+        public Application(IPAddress iPAddress, int port)
+        {
+            IPAddress = iPAddress;
+            ListenPort = port;
+            TcpListener = new TcpListener(IPAddress, ListenPort);
+        }
 
         public void Start()
         {
             CacheService.Configure();
             StartListen();
-            
+
             while (true) HandleConnection();
         }
 
@@ -31,20 +38,8 @@ namespace MantoProxy
         {
             TcpClient client = TcpListener.AcceptTcpClient();
 
-            new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-
-                try
-                {
-                    ConnectionHandler.Handle(client);
-                }
-                catch
-                {
-                }
-            }).Start();
-
-            // Task.Run(() => ConnectionHandler.Handle(client));
+            var workerThread = new Thread(async () => await ConnectionHandler.Handle(client));
+            workerThread.Start();
         }
     }
 }

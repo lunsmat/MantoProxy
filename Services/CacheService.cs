@@ -15,27 +15,66 @@ namespace MantoProxy.Services
         {
             if (Configured) return;
 
-            Connection = ConnectionMultiplexer.Connect($"{RedisConfig.Host}");
-            Database = Connection.GetDatabase();
-            Configured = true;
-            Console.WriteLine("Configured Redis Cache!");
+            var options = new ConfigurationOptions()
+            {
+                EndPoints =  {
+                    { RedisConfig.Host, RedisConfig.Port }
+                },
+                AsyncTimeout = RedisConfig.DefaultTimeout,
+                SyncTimeout = RedisConfig.DefaultTimeout,
+            };
+
+            do
+            {
+                try
+                {
+                    Connection = ConnectionMultiplexer.Connect(options);
+                    Database = Connection.GetDatabase();
+                    Configured = true;
+                    Console.WriteLine("Configured Redis Cache!");
+                }
+                catch
+                {
+                    Console.WriteLine("Redis not connected! Trying in 5s!");
+                    var task = Task.Run(() =>
+                    {
+                        Task.Delay(5000).Wait();
+                    });
+                    task.Wait();
+                }
+            } while (!Configured);
+
         }
 
-        public static void Store(string key, string value, TimeSpan? expiry = null)
+        public async static void Store(string key, string value, TimeSpan? expiry = null)
         {
             if (!Configured || Database == null) return;
 
-            Database.StringSet(key, value, expiry);
+            try
+            {
+                await Database.StringSetAsync(key, value, expiry);
+            }
+            catch (Exception)
+            {
+                return;
+            }
         }
 
-        public static string Retrieve(string key)
+        public async static Task<string> Retrieve(string key)
         {
             if (!Configured || Database == null) return String.Empty;
 
-            var data = Database.StringGet(key);
-            if (String.IsNullOrEmpty(data)) return String.Empty;
+            try
+            {
+                var data = await Database.StringGetAsync(key);
+                if (String.IsNullOrEmpty(data)) return String.Empty;
 
-            return data.ToString();
+                return data.ToString();
+            }
+            catch (Exception)
+            {
+                return String.Empty;
+            }
         }
     }
 }

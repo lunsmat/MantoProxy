@@ -1,86 +1,80 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
+using MantoProxy.Enums;
+using MantoProxy.Helpers;
+using MantoProxy.Models;
+using MantoProxy.Services;
 
 namespace MantoProxy.Handlers
 {
     class ConnectionHandler
     {
+        private bool AuthenticationEnabled = false;
         private readonly TcpClient Client;
-
         private readonly NetworkStream Stream;
-
         private readonly StreamReader Reader;
-
-        private string[] Tokens = [];
-
+        private string[] Tokens = Array.Empty<string>();
         private readonly string RemoteIP;
-
-        private readonly string MacAddress;
-
         private string? AuthHeader;
+        private readonly List<string> Lines = new();
+        private readonly DeviceData Device;
 
         private string FirstLine => Lines.FirstOrDefault(String.Empty);
+        private string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
+        private string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
 
-        public string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
-
-        public string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
-
-    
-        private readonly List<string> Lines = [];
-
-        ConnectionHandler(TcpClient client)
+        private ConnectionHandler(TcpClient client, string ip, DeviceData device)
         {
             Client = client;
-            Stream = Client.GetStream();
-            #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-            #pragma warning disable CS8602 // Dereference of a possibly null reference.
-            RemoteIP = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
-            MacAddress = MacHandler.FromIP(RemoteIP);
-
+            Stream = client.GetStream();
             Reader = new StreamReader(Stream);
-            GetLines();
+            RemoteIP = ip;
+            Device = device;
         }
 
-        public void GetLines()
+        public static async Task Handle(TcpClient client)
         {
-            Lines.Clear();
-            string? line;
+            string ip = string.Empty;
+            if (client.Client.RemoteEndPoint is IPEndPoint ep)
+                ip = ep.Address.ToString();
 
-            while (!String.IsNullOrEmpty(line = Reader.ReadLine()))
+            var data = await DeviceDataHandler.FromIP(ip);
+            if (data == null)
             {
-                line?.Replace("127.0.0.1", RemoteIP);
-                line?.Replace("localhost", RemoteIP);
-                Lines.Add(line ?? String.Empty);
-                CheckAuthHeader(line ?? String.Empty);
-            }
-        }
-
-        public void CheckAuthHeader(string line)
-        {
-            if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
-            {
-                AuthHeader = line;
+                client.Close();
                 return;
             }
-        }
 
-        public static void Handle(TcpClient client)
-        {
-            var handler = new ConnectionHandler(client);
+            var handler = new ConnectionHandler(client, ip, data);
+            handler.GetLines();
 
             try
             {
-                handler.Run();
+                await handler.Run();
+            }
+            catch (SocketException ex)
+            {
+                switch (ex.SocketErrorCode)
+                {
+                    case SocketError.HostNotFound:
+                        break;
+                    default:
+                        throw;
+                }
             }
             catch (Exception ex)
             {
-                var error = String.Empty;
-                error += "-------------------------- Request --------------------------\n";
-                error += $"[ERRO] Erro no Handle: {ex.ToString()}\n\n";
-                error += $"Request: {String.Join('\n', handler.Lines)}\n";
-                Console.WriteLine(error);
+                var error = new StringBuilder();
+                error.AppendLine("-------------------------- Request --------------------------");
+                error.AppendLine($"[ERRO] {ex}");
+                error.AppendLine($"Request: {string.Join('\n', handler.Lines)}");
+                Console.WriteLine(error.ToString());
             }
             finally
             {
@@ -88,180 +82,174 @@ namespace MantoProxy.Handlers
             }
         }
 
-        private void Run()
+        private async Task Run()
         {
-            // if (String.IsNullOrEmpty(AuthHeader))
-            // {
-            //     Console.WriteLine("No Auth Header");
-            //     SendAuthRequiredResponse();
-            //     return;
-            // }
-            // if (!AuthHandler.HasPermission(AuthHeader))
-            // {
-            //     Console.WriteLine("Not allowed");
-            //     SendAuthRequiredResponse();
-            //     return;
-            // }
-
-            if (String.IsNullOrEmpty(FirstLine)) return;
-
-            if (!NetworkPermissionHandler.HasPermission(MacAddress))
-            {
-                // Console.WriteLine("Bloqueado por Falta de Permissão: " + MacAddress + " " + HttpUrl);
-                SendUnauthorizedResponse();
-                return;
-            }
-
-            if (!FirewallHandler.HasPermission(MacAddress, HttpUrl))
-            {
-                // Console.WriteLine("Bloqueado pelo Proxy: " + MacAddress + " " + HttpUrl);
-                SendNotAcceptableResponse();
-                return;
-            }
+            if (!await AllowedToRun()) return;
 
             Tokens = FirstLine.Split(' ');
             if (Tokens[0].Equals("CONNECT", StringComparison.CurrentCultureIgnoreCase))
             {
-                HandleConnect();
+                await HandleConnect();
                 return;
             }
 
-            HandleHTTPMethods();
+            await HandleHTTPMethods();
         }
 
-        private void SendAuthRequiredResponse()
+        private async Task<bool> AllowedToRun()
         {
-            string response =
-                "HTTP/1.1 407 Proxy Authentication Required\r\n" +
-                "Proxy-Authenticate: Basic realm=\"MantoProxy\"\r\n" +
-                "Content-Length: 0\r\n\r\n";
+            if (AuthenticationEnabled)
+            {
+                if (string.IsNullOrEmpty(AuthHeader))
+                {
+                    await SendResponse(ResponseCodes.ProxyAuthenticationRequired);
+                    return false;
+                }
 
-            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-            Stream.Write(responseBytes, 0, responseBytes.Length);
+                if (!AuthHandler.HasPermission(AuthHeader))
+                {
+                    await SendResponse(ResponseCodes.ProxyAuthenticationRequired);
+                    return false;
+                }
+            }
+
+            if (string.IsNullOrEmpty(FirstLine))
+            {
+                await SendResponse(ResponseCodes.ImATeapot);
+                return false;
+            }
+
+            if (!Device.AllowConnection)
+            {
+                await SendResponse(ResponseCodes.PreconditionRequired);
+                return false;
+            }
+
+            if (Device.FiltersList.Any(f => f.Contains(HttpUrl)))
+            {
+                await SendResponse(ResponseCodes.NotAcceptable);
+                return false;
+            }
+
+            return true;
         }
 
-        private void SendNotAcceptableResponse()
+        private async Task SendResponse(ResponseCodes code)
         {
-            string response =
-                "HTTP/1.1 406 Not Acceptable Required\r\n" +
-                "Content-Length: 0\r\n\r\n";
+            if (!Client.Connected) return;
 
-            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-            Stream.Write(responseBytes, 0, responseBytes.Length);
+            var data = ResponseHelper.HandleResponse(code);
+            await Stream.WriteAsync(data);
         }
 
-        private void SendUnauthorizedResponse()
+        private async Task HandleHTTPMethods()
         {
-            string response =
-                "HTTP/1.1 428 Precondition Required\r\n" +
-                "Content-Length: 0\r\n\r\n";
-
-            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-            Stream.Write(responseBytes, 0, responseBytes.Length);
-        }
-
-        private void HandleHTTPMethods()
-        {
-            string host = String.Empty;
+            string host = string.Empty;
             var requestBuilder = new StringBuilder();
 
             foreach (var line in Lines)
             {
                 requestBuilder.AppendLine(line);
-
-                if (line.StartsWith("Host: "))
+                if (line.StartsWith("Host: ", StringComparison.OrdinalIgnoreCase))
                     host = line[6..].Trim();
             }
 
             if (string.IsNullOrEmpty(host))
             {
-                // Console.WriteLine("[ERRO] Host não encontrado.");
+                await SendResponse(ResponseCodes.ImATeapot);
                 return;
             }
-            // Console.WriteLine($"[INFO] Requisição HTTP para: {host}");
 
-            TcpClient server = new(host, 80);
-            NetworkStream serverStream = server.GetStream();
+            if (!IPAddress.TryParse(host, out var ipAddress))
+            {
+                var addresses = await Dns.GetHostAddressesAsync(host);
+                if (addresses.Length == 0)
+                    throw new SocketException((int)SocketError.HostNotFound);
+
+                ipAddress = addresses[0];
+            }
+
+            using TcpClient server = new();
+            await server.ConnectAsync(ipAddress, 80);
+            using NetworkStream serverStream = server.GetStream();
 
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
-            serverStream.Write(requestBytes, 0, requestBytes.Length);
+            await serverStream.WriteAsync(requestBytes);
 
+            await Task.Run(() => Relay(serverStream, Stream));
 
-            var connThread = new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-                Relay(serverStream, Stream);
-            });
-            var logThread = new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-                LogHandler.LogConnection(MacAddress, HttpMethod, HttpUrl, String.Join('\n', Lines));
-            });
-            connThread.Start();
-            connThread.Join();
-            logThread.Start();
-            logThread.Join();
+            await Log();
         }
 
-        private void HandleConnect()
+        private async Task HandleConnect()
         {
             string[] hostParts = Tokens[1].Split(':');
             string host = hostParts[0];
             int port = int.Parse(hostParts[1]);
 
-            // Console.WriteLine($"[INFO] Túnel HTTP para {host}:{port}");
+            if (!IPAddress.TryParse(host, out var ipAddress))
+            {
+                var addresses = await Dns.GetHostAddressesAsync(host);
+                if (addresses.Length == 0)
+                {
+                    await SendResponse(ResponseCodes.BadGateway);
+                    return;
+                }
+                ipAddress = addresses[0];
+            }
 
-            var server = new TcpClient(host, port);
-            var serverStream = server.GetStream();
+            using TcpClient server = new();
+            await server.ConnectAsync(ipAddress, port);
+            using NetworkStream serverStream = server.GetStream();
 
             byte[] okResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
-            Stream.Write(okResponse, 0, okResponse.Length);
+            await Stream.WriteAsync(okResponse);
 
-            // Task clientToServer = Task.Run(() => Relay(Stream, serverStream));
-            // Task serverToClient = Task.Run(() => Relay(serverStream, Stream));
-            // Task.WaitAll(clientToServer, serverToClient);
+            var clientToServer = Task.Run(() => Relay(Stream, serverStream));
+            var serverToClient = Task.Run(() => Relay(serverStream, Stream));
+            await Task.WhenAll(clientToServer, serverToClient);
 
-            var clientThread = new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-
-                Relay(Stream, serverStream);
-            });
-            var serverThread = new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-                Relay(serverStream, Stream);
-            });
-            var logThread = new Thread(() =>
-            {
-                Thread.CurrentThread.IsBackground = true;
-                LogHandler.LogConnection(MacAddress, HttpMethod, HttpUrl, String.Join('\n', Lines));
-            });
-            clientThread.Start();
-            serverThread.Start();
-            logThread.Start();
-            clientThread.Join();
-            serverThread.Join();
-            logThread.Join();
+            await Log();
         }
 
         private static void Relay(Stream input, Stream output)
         {
             byte[] buffer = new byte[4096];
             int bytesRead;
-            try
+            while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
             {
-                while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    output.Write(buffer, 0, bytesRead);
-                }
+                output.Write(buffer, 0, bytesRead);
             }
-            catch { }
+        }
+
+        private void GetLines()
+        {
+            Lines.Clear();
+            string? line;
+            while (!string.IsNullOrEmpty(line = Reader.ReadLine()))
+            {
+                line?.Replace("127.0.0.1", RemoteIP);
+                line?.Replace("localhost", RemoteIP);
+                Lines.Add(line ?? string.Empty);
+                CheckAuthHeader(line ?? string.Empty);
+            }
+        }
+
+        private void CheckAuthHeader(string line)
+        {
+            if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
+                AuthHeader = line;
+        }
+
+        private async Task Log()
+        {
+            await DeviceLogService.Create(Device.Id, HttpMethod, HttpUrl, string.Join('\n', Lines));
         }
 
         private void CloseClient()
         {
-            Client.Close();
+            if (Client.Connected)
+                Client.Close();
         }
     }
 }
