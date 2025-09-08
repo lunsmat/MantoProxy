@@ -1,5 +1,6 @@
 using StackExchange.Redis;
 using MantoProxy.Config;
+using System.Diagnostics;
 
 namespace MantoProxy.Services
 {
@@ -52,7 +53,10 @@ namespace MantoProxy.Services
 
             try
             {
+                var watch = Stopwatch.StartNew();
                 await Database.StringSetAsync(key, value, expiry);
+                watch.Stop();
+                Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "SET"));
             }
             catch (Exception)
             {
@@ -66,7 +70,11 @@ namespace MantoProxy.Services
 
             try
             {
+                var watch = Stopwatch.StartNew();
                 var data = await Database.StringGetAsync(key);
+                watch.Stop();
+                Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "GET"));
+
                 if (String.IsNullOrEmpty(data)) return String.Empty;
 
                 return data.ToString();

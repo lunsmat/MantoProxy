@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MantoProxy.Database;
 using MantoProxy.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,13 @@ namespace MantoProxy.Services
 
             var query = $"SELECT id, name, mac_address, allow_connection, filters FROM device_data WHERE mac_address = {mac} LIMIT = 1";
 
+            var watch = Stopwatch.StartNew();
             var result = await context
                 .DeviceData
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.MacAddress == mac);
+            watch.Stop();
+            Application.DatabaseLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "select.device_data"));
 
 
             return result;

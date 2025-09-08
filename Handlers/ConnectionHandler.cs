@@ -16,17 +16,27 @@ namespace MantoProxy.Handlers
     class ConnectionHandler
     {
         private bool AuthenticationEnabled = false;
+
         private readonly TcpClient Client;
+
         private readonly NetworkStream Stream;
+
         private readonly StreamReader Reader;
+
         private string[] Tokens = Array.Empty<string>();
+
         private readonly string RemoteIP;
+
         private string? AuthHeader;
+
         private readonly List<string> Lines = new();
+
         private readonly DeviceData Device;
 
         private string FirstLine => Lines.FirstOrDefault(String.Empty);
+
         private string HttpMethod => FirstLine.Split(' ').FirstOrDefault(String.Empty);
+
         private string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
 
         private ConnectionHandler(TcpClient client, string ip, DeviceData device)
@@ -47,6 +57,11 @@ namespace MantoProxy.Handlers
             var data = await DeviceDataHandler.FromIP(ip);
             if (data == null)
             {
+                Application.Requests.Add(
+                    1,
+                    KeyValuePair.Create<string, object?>("Requests", "Failed"),
+                    KeyValuePair.Create<string, object?>("Requests", "Failed.DataNotFound")
+                );
                 client.Close();
                 return;
             }
@@ -63,8 +78,10 @@ namespace MantoProxy.Handlers
                 switch (ex.SocketErrorCode)
                 {
                     case SocketError.HostNotFound:
+                    case SocketError.ConnectionReset:
                         break;
                     default:
+                        Console.WriteLine("Error: " + ex.SocketErrorCode);
                         throw;
                 }
             }
@@ -75,6 +92,11 @@ namespace MantoProxy.Handlers
                 error.AppendLine($"[ERRO] {ex}");
                 error.AppendLine($"Request: {string.Join('\n', handler.Lines)}");
                 Console.WriteLine(error.ToString());
+                Application.Requests.Add(
+                    1,
+                    KeyValuePair.Create<string, object?>("Requests", "Failed"),
+                    KeyValuePair.Create<string, object?>("Requests", "Failed.Exception")
+                );
             }
             finally
             {
@@ -139,6 +161,11 @@ namespace MantoProxy.Handlers
             if (!Client.Connected) return;
 
             var data = ResponseHelper.HandleResponse(code);
+                Application.Requests.Add(
+                    1,
+                    KeyValuePair.Create<string, object?>("Requests", "Failed"),
+                    KeyValuePair.Create<string, object?>("Response", $"Code.{(int) code}")
+                );
             await Stream.WriteAsync(data);
         }
 
@@ -177,6 +204,7 @@ namespace MantoProxy.Handlers
             await serverStream.WriteAsync(requestBytes);
 
             await Task.Run(() => Relay(serverStream, Stream));
+            Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
             await Log();
         }
@@ -208,6 +236,7 @@ namespace MantoProxy.Handlers
             var clientToServer = Task.Run(() => Relay(Stream, serverStream));
             var serverToClient = Task.Run(() => Relay(serverStream, Stream));
             await Task.WhenAll(clientToServer, serverToClient);
+            Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
             await Log();
         }

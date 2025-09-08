@@ -18,7 +18,7 @@ namespace MantoProxy.Handlers
             try
             {
                 if (string.IsNullOrEmpty(ip)) return null;
-                
+
                 var mac = await RecoverMacFromIP(ip);
                 if (String.IsNullOrEmpty(mac)) return null;
 
@@ -56,6 +56,7 @@ namespace MantoProxy.Handlers
 
             if (String.IsNullOrEmpty(mac))
             {
+                var watch = Stopwatch.StartNew();
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -70,12 +71,13 @@ namespace MantoProxy.Handlers
                 process.Start();
 
                 await process.WaitForExitAsync();
+                Application.CommandLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("command", "arp"));
                 string output = process.StandardOutput.ReadToEnd();
 
                 mac = GetMacFromARPOutput(output, ip);
                 if (!String.IsNullOrEmpty(mac))
                     StoreInCache(MacFromIPCachePrefix + ip, mac);
-            }   
+            }
 
             return mac;
         }
