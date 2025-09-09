@@ -214,7 +214,10 @@ namespace MantoProxy.Handlers
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
             await serverStream.WriteAsync(requestBytes);
 
-            await Task.Run(() => Relay(serverStream, Stream));
+            var thread = new Thread(() => Relay(serverStream, Stream));
+            thread.Start();
+            thread.Join();
+            CloseClient();
             Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
             await Log();
@@ -246,9 +249,16 @@ namespace MantoProxy.Handlers
             byte[] okResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
             await Stream.WriteAsync(okResponse);
 
-            var clientToServer = Task.Run(() => Relay(Stream, serverStream));
-            var serverToClient = Task.Run(() => Relay(serverStream, Stream));
-            await Task.WhenAll(clientToServer, serverToClient);
+            var clientToServer = new Thread(() => Relay(Stream, serverStream));
+            var serverToClient = new Thread(() => Relay(serverStream, Stream));
+
+            clientToServer.Start();
+            serverToClient.Start();
+
+            clientToServer.Join();
+            serverToClient.Join();
+
+            CloseClient();
             Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
             await Log();
