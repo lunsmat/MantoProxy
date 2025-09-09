@@ -21,19 +21,19 @@ namespace MantoProxy
 
         public static Meter Meters = new("MantoProxy");
 
-        public static Counter<int> RequestsTotal = Meters.CreateCounter<int>("MantoProxy.Requests.Total");
+        public static Counter<int> RequestsTotal = Meters.CreateCounter<int>("MantoProxy.RequestsTotal");
 
         public static Counter<int> Requests = Meters.CreateCounter<int>("MantoProxy.Requests");
 
-        public static Histogram<double> RequestsDuration = Meters.CreateHistogram<double>("MantoProxy.Requests.Duration");
+        public static Histogram<double> RequestsDuration = Meters.CreateHistogram<double>("MantoProxy.RequestsDuration");
 
-        public static Histogram<double> RequestsDurationNoNetwork = Meters.CreateHistogram<double>("MantoProxy.Requests.Duration.NoNetwork");
+        public static Histogram<double> RequestsDurationNoNetwork = Meters.CreateHistogram<double>("MantoProxy.RequestsDurationNoNetwork");
 
-        public static Histogram<double> CommandLatency = Meters.CreateHistogram<double>(name: "MantoProxy.Command.Latency", unit: "ms");
+        public static Histogram<double> CommandLatency = Meters.CreateHistogram<double>(name: "MantoProxy.CommandLatency", unit: "ms");
 
-        public static Histogram<double> CacheLatency = Meters.CreateHistogram<double>(name: "MantoProxy.Cache.Latency", unit: "ms");
+        public static Histogram<double> CacheLatency = Meters.CreateHistogram<double>(name: "MantoProxy.CacheLatency", unit: "ms");
 
-        public static Histogram<double> DatabaseLatency = Meters.CreateHistogram<double>(name: "MantoProxy.Database.Latency", unit: " ms");
+        public static Histogram<double> DatabaseLatency = Meters.CreateHistogram<double>(name: "MantoProxy.DatabaseLatency", unit: " ms");
 
         public Application(IPAddress iPAddress, int port)
         {
