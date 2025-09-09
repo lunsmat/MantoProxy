@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -39,17 +40,21 @@ namespace MantoProxy.Handlers
 
         private string HttpUrl => FirstLine.Split(' ').ElementAtOrDefault(1) ?? String.Empty;
 
-        private ConnectionHandler(TcpClient client, string ip, DeviceData device)
+        private Stopwatch Watch;
+
+        private ConnectionHandler(TcpClient client, string ip, DeviceData device, Stopwatch? watch = null)
         {
             Client = client;
             Stream = client.GetStream();
             Reader = new StreamReader(Stream);
             RemoteIP = ip;
             Device = device;
+            Watch = watch ?? Stopwatch.StartNew();
         }
 
         public static async Task Handle(TcpClient client)
         {
+            var watch = Stopwatch.StartNew();
             string ip = string.Empty;
             if (client.Client.RemoteEndPoint is IPEndPoint ep)
                 ip = ep.Address.ToString();
@@ -66,7 +71,7 @@ namespace MantoProxy.Handlers
                 return;
             }
 
-            var handler = new ConnectionHandler(client, ip, data);
+            var handler = new ConnectionHandler(client, ip, data, watch);
             handler.GetLines();
 
             try
@@ -106,7 +111,11 @@ namespace MantoProxy.Handlers
 
         private async Task Run()
         {
-            if (!await AllowedToRun()) return;
+            if (!await AllowedToRun())
+            {
+                NoNetWorkMetricRegister();
+                return;
+            }
 
             Tokens = FirstLine.Split(' ');
             if (Tokens[0].Equals("CONNECT", StringComparison.CurrentCultureIgnoreCase))
@@ -161,11 +170,11 @@ namespace MantoProxy.Handlers
             if (!Client.Connected) return;
 
             var data = ResponseHelper.HandleResponse(code);
-                Application.Requests.Add(
-                    1,
-                    KeyValuePair.Create<string, object?>("Requests", "Failed"),
-                    KeyValuePair.Create<string, object?>("Response", $"Code.{(int) code}")
-                );
+            Application.Requests.Add(
+                1,
+                KeyValuePair.Create<string, object?>("Requests", "Failed"),
+                KeyValuePair.Create<string, object?>("Response", $"Code.{(int)code}")
+            );
             await Stream.WriteAsync(data);
         }
 
@@ -196,6 +205,8 @@ namespace MantoProxy.Handlers
                 ipAddress = addresses[0];
             }
 
+            NoNetWorkMetricRegister();
+
             using TcpClient server = new();
             await server.ConnectAsync(ipAddress, 80);
             using NetworkStream serverStream = server.GetStream();
@@ -225,6 +236,8 @@ namespace MantoProxy.Handlers
                 }
                 ipAddress = addresses[0];
             }
+
+            NoNetWorkMetricRegister();
 
             using TcpClient server = new();
             await server.ConnectAsync(ipAddress, port);
@@ -279,6 +292,12 @@ namespace MantoProxy.Handlers
         {
             if (Client.Connected)
                 Client.Close();
+        }
+
+        private void NoNetWorkMetricRegister()
+        {
+            Watch.Stop();
+            Application.RequestsDurationNoNetwork.Record(Watch.Elapsed.TotalMilliseconds);
         }
     }
 }

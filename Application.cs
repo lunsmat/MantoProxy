@@ -27,6 +27,8 @@ namespace MantoProxy
 
         public static Histogram<double> RequestsDuration = Meters.CreateHistogram<double>("MantoProxy.Requests.Duration");
 
+        public static Histogram<double> RequestsDurationNoNetwork = Meters.CreateHistogram<double>("MantoProxy.Requests.Duration.NoNetwork");
+
         public static Histogram<double> CommandLatency = Meters.CreateHistogram<double>(name: "MantoProxy.Command.Latency", unit: "ms");
 
         public static Histogram<double> CacheLatency = Meters.CreateHistogram<double>(name: "MantoProxy.Cache.Latency", unit: "ms");
@@ -40,7 +42,7 @@ namespace MantoProxy
             TcpListener = new TcpListener(IPAddress, ListenPort);
             MeterProvider = Sdk.CreateMeterProviderBuilder()
                 .AddMeter("MantoProxy")
-                .AddPrometheusHttpListener(options => options.UriPrefixes = new string[] { "http://localhost:9184/" })
+                .AddPrometheusHttpListener(options => options.UriPrefixes = ["http://localhost:9184"])
                 .Build();
         }
 
