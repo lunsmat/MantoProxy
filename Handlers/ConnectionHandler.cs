@@ -204,19 +204,10 @@ namespace MantoProxy.Handlers
                 return;
             }
 
-            if (!IPAddress.TryParse(host, out var ipAddress))
-            {
-                var addresses = Dns.GetHostAddresses(host);
-                if (addresses.Length == 0)
-                    throw new SocketException((int)SocketError.HostNotFound);
-
-                ipAddress = addresses[0];
-            }
-
             NoNetWorkMetricRegister();
 
             using TcpClient server = new();
-            server.Connect(ipAddress, 80);
+            server.Connect(host, 80);
             using NetworkStream serverStream = server.GetStream();
 
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
@@ -235,22 +226,10 @@ namespace MantoProxy.Handlers
             string host = hostParts[0];
             int port = int.Parse(hostParts[1]);
 
-            if (!IPAddress.TryParse(host, out var ipAddress))
-            {
-                var addresses = Dns.GetHostAddresses(host);
-                if (addresses.Length == 0)
-                {
-                    Application.DebugLog("Nenhum DNS para o Host: " + host);
-                    SendResponse(ResponseCodes.BadGateway);
-                    return;
-                }
-                ipAddress = addresses[0];
-            }
-
             NoNetWorkMetricRegister();
 
             using TcpClient server = new();
-            server.Connect(ipAddress, port);
+            server.Connect(host, port);
             using NetworkStream serverStream = server.GetStream();
 
             byte[] okResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");

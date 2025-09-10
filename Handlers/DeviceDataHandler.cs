@@ -11,7 +11,7 @@ namespace MantoProxy.Handlers
     {
         private const string MacFromIPCachePrefix = "mac-from-ip-";
 
-        private const string DataFromMacCachePrefix = "data-from-mac";
+        private const string DataFromMacCachePrefix = "data-from-mac-";
 
         public static DeviceData? FromIP(string ip)
         {
