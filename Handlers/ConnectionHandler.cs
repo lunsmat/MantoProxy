@@ -264,13 +264,33 @@ namespace MantoProxy.Handlers
             Log();
         }
 
-        private static void Relay(Stream input, Stream output)
+        private void Relay(Stream input, Stream output)
         {
             byte[] buffer = new byte[4096];
             int bytesRead;
-            while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
+
+            try
             {
-                output.Write(buffer, 0, bytesRead);
+                while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    output.Write(buffer, 0, bytesRead);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (Exception ex)
+            {
+                var error = new StringBuilder();
+                error.AppendLine("-------------------------- Request --------------------------");
+                error.AppendLine($"[ERRO] {ex}");
+                error.AppendLine($"Request: {string.Join('\n', Lines)}");
+                Console.WriteLine(error.ToString());
+                Application.Requests.Add(
+                    1,
+                    KeyValuePair.Create<string, object?>("Requests", "Failed"),
+                    KeyValuePair.Create<string, object?>("Requests", "Failed.Exception")
+                );
             }
         }
 
