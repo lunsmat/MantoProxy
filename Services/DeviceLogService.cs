@@ -6,7 +6,7 @@ namespace MantoProxy.Services
 {
     class DeviceLogService
     {
-        public async static Task<DeviceLog> Create(int deviceId, string httpMethod, string httpUrl, string httpHeaders)
+        public static DeviceLog Create(int deviceId, string httpMethod, string httpUrl, string httpHeaders)
         {
             var context = new DatabaseContext();
 
@@ -22,8 +22,8 @@ namespace MantoProxy.Services
             };
 
             var watch = Stopwatch.StartNew();
-            await context.DeviceLogs.AddAsync(deviceLog);
-            await context.SaveChangesAsync();
+            context.DeviceLogs.Add(deviceLog);
+            context.SaveChanges();
             watch.Stop();
             Application.DatabaseLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "insert.device_log"));
 

@@ -13,16 +13,16 @@ namespace MantoProxy.Handlers
 
         private const string DataFromMacCachePrefix = "data-from-mac";
 
-        public async static Task<DeviceData?> FromIP(string ip)
+        public static DeviceData? FromIP(string ip)
         {
             try
             {
                 if (string.IsNullOrEmpty(ip)) return null;
 
-                var mac = await RecoverMacFromIP(ip);
+                var mac = RecoverMacFromIP(ip);
                 if (String.IsNullOrEmpty(mac)) return null;
 
-                var data = await RecoverDataFromMac(mac);
+                var data = RecoverDataFromMac(mac);
 
                 return data;
             }
@@ -33,11 +33,11 @@ namespace MantoProxy.Handlers
             }
         }
 
-        private async static Task<string> TryFromCache(string key)
+        private static string TryFromCache(string key)
         {
             try
             {
-                var data = await CacheService.Retrieve(key);
+                var data = CacheService.Retrieve(key);
                 if (String.IsNullOrEmpty(data)) return String.Empty;
 
                 return data;
@@ -49,10 +49,10 @@ namespace MantoProxy.Handlers
             }
         }
 
-        private async static Task<string> RecoverMacFromIP(string ip)
+        private static string RecoverMacFromIP(string ip)
         {
 
-            string mac = await TryFromCache(MacFromIPCachePrefix + ip);
+            string mac = TryFromCache(MacFromIPCachePrefix + ip);
 
             if (String.IsNullOrEmpty(mac))
             {
@@ -70,7 +70,7 @@ namespace MantoProxy.Handlers
                 };
                 process.Start();
 
-                await process.WaitForExitAsync();
+                process.WaitForExit();
                 Application.CommandLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("command", "arp"));
                 string output = process.StandardOutput.ReadToEnd();
 
@@ -82,16 +82,16 @@ namespace MantoProxy.Handlers
             return mac;
         }
 
-        private async static Task<DeviceData?> RecoverDataFromMac(string mac)
+        private static DeviceData? RecoverDataFromMac(string mac)
         {
-            string json = await TryFromCache(DataFromMacCachePrefix + mac);
+            string json = TryFromCache(DataFromMacCachePrefix + mac);
             if (!String.IsNullOrEmpty(json))
             {
                 var jsonData = JsonSerializer.Deserialize<DeviceData>(json);
                 return jsonData;
             }
 
-            var data = await DeviceDataService.GetDeviceDataFromMac(mac);
+            var data = DeviceDataService.GetDeviceDataFromMac(mac);
             if (data != null) StoreInCache(DataFromMacCachePrefix + mac, JsonSerializer.Serialize(data));
             return data;
         }

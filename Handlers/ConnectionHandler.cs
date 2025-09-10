@@ -52,14 +52,14 @@ namespace MantoProxy.Handlers
             Watch = watch ?? Stopwatch.StartNew();
         }
 
-        public static async Task Handle(TcpClient client)
+        public static void Handle(TcpClient client)
         {
             var watch = Stopwatch.StartNew();
             string ip = string.Empty;
             if (client.Client.RemoteEndPoint is IPEndPoint ep)
                 ip = ep.Address.ToString();
 
-            var data = await DeviceDataHandler.FromIP(ip);
+            var data = DeviceDataHandler.FromIP(ip);
             if (data == null)
             {
                 Application.Requests.Add(
@@ -76,7 +76,7 @@ namespace MantoProxy.Handlers
 
             try
             {
-                await handler.Run();
+                handler.Run();
             }
             catch (SocketException ex)
             {
@@ -109,9 +109,9 @@ namespace MantoProxy.Handlers
             }
         }
 
-        private async Task Run()
+        private void Run()
         {
-            if (!await AllowedToRun())
+            if (!AllowedToRun())
             {
                 NoNetWorkMetricRegister();
                 return;
@@ -120,52 +120,52 @@ namespace MantoProxy.Handlers
             Tokens = FirstLine.Split(' ');
             if (Tokens[0].Equals("CONNECT", StringComparison.CurrentCultureIgnoreCase))
             {
-                await HandleConnect();
+                HandleConnect();
                 return;
             }
 
-            await HandleHTTPMethods();
+            HandleHTTPMethods();
         }
 
-        private async Task<bool> AllowedToRun()
+        private bool AllowedToRun()
         {
             if (AuthenticationEnabled)
             {
                 if (string.IsNullOrEmpty(AuthHeader))
                 {
-                    await SendResponse(ResponseCodes.ProxyAuthenticationRequired);
+                    SendResponse(ResponseCodes.ProxyAuthenticationRequired);
                     return false;
                 }
 
                 if (!AuthHandler.HasPermission(AuthHeader))
                 {
-                    await SendResponse(ResponseCodes.ProxyAuthenticationRequired);
+                    SendResponse(ResponseCodes.ProxyAuthenticationRequired);
                     return false;
                 }
             }
 
             if (string.IsNullOrEmpty(FirstLine))
             {
-                await SendResponse(ResponseCodes.ImATeapot);
+                SendResponse(ResponseCodes.ImATeapot);
                 return false;
             }
 
             if (!Device.AllowConnection)
             {
-                await SendResponse(ResponseCodes.PreconditionRequired);
+                SendResponse(ResponseCodes.PreconditionRequired);
                 return false;
             }
 
             if (Device.FiltersList.Any(f => f.Contains(HttpUrl)))
             {
-                await SendResponse(ResponseCodes.NotAcceptable);
+                SendResponse(ResponseCodes.NotAcceptable);
                 return false;
             }
 
             return true;
         }
 
-        private async Task SendResponse(ResponseCodes code)
+        private void SendResponse(ResponseCodes code)
         {
             if (!Client.Connected) return;
 
@@ -175,10 +175,10 @@ namespace MantoProxy.Handlers
                 KeyValuePair.Create<string, object?>("Requests", "Failed"),
                 KeyValuePair.Create<string, object?>("Response", $"Code.{(int)code}")
             );
-            await Stream.WriteAsync(data);
+            Stream.Write(data);
         }
 
-        private async Task HandleHTTPMethods()
+        private void HandleHTTPMethods()
         {
             string host = string.Empty;
             var requestBuilder = new StringBuilder();
@@ -192,13 +192,13 @@ namespace MantoProxy.Handlers
 
             if (string.IsNullOrEmpty(host))
             {
-                await SendResponse(ResponseCodes.ImATeapot);
+                SendResponse(ResponseCodes.ImATeapot);
                 return;
             }
 
             if (!IPAddress.TryParse(host, out var ipAddress))
             {
-                var addresses = await Dns.GetHostAddressesAsync(host);
+                var addresses = Dns.GetHostAddresses(host);
                 if (addresses.Length == 0)
                     throw new SocketException((int)SocketError.HostNotFound);
 
@@ -208,11 +208,11 @@ namespace MantoProxy.Handlers
             NoNetWorkMetricRegister();
 
             using TcpClient server = new();
-            await server.ConnectAsync(ipAddress, 80);
+            server.Connect(ipAddress, 80);
             using NetworkStream serverStream = server.GetStream();
 
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
-            await serverStream.WriteAsync(requestBytes);
+            serverStream.Write(requestBytes);
 
             var thread = new Thread(() => Relay(serverStream, Stream));
             thread.Start();
@@ -220,10 +220,10 @@ namespace MantoProxy.Handlers
             CloseClient();
             Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
-            await Log();
+            Log();
         }
 
-        private async Task HandleConnect()
+        private void HandleConnect()
         {
             string[] hostParts = Tokens[1].Split(':');
             string host = hostParts[0];
@@ -231,10 +231,10 @@ namespace MantoProxy.Handlers
 
             if (!IPAddress.TryParse(host, out var ipAddress))
             {
-                var addresses = await Dns.GetHostAddressesAsync(host);
+                var addresses = Dns.GetHostAddresses(host);
                 if (addresses.Length == 0)
                 {
-                    await SendResponse(ResponseCodes.BadGateway);
+                    SendResponse(ResponseCodes.BadGateway);
                     return;
                 }
                 ipAddress = addresses[0];
@@ -243,11 +243,11 @@ namespace MantoProxy.Handlers
             NoNetWorkMetricRegister();
 
             using TcpClient server = new();
-            await server.ConnectAsync(ipAddress, port);
+            server.Connect(ipAddress, port);
             using NetworkStream serverStream = server.GetStream();
 
             byte[] okResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
-            await Stream.WriteAsync(okResponse);
+            Stream.Write(okResponse);
 
             var clientToServer = new Thread(() => Relay(Stream, serverStream));
             var serverToClient = new Thread(() => Relay(serverStream, Stream));
@@ -261,7 +261,7 @@ namespace MantoProxy.Handlers
             CloseClient();
             Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
-            await Log();
+            Log();
         }
 
         private static void Relay(Stream input, Stream output)
@@ -293,9 +293,9 @@ namespace MantoProxy.Handlers
                 AuthHeader = line;
         }
 
-        private async Task Log()
+        private void Log()
         {
-            await DeviceLogService.Create(Device.Id, HttpMethod, HttpUrl, string.Join('\n', Lines));
+            DeviceLogService.Create(Device.Id, HttpMethod, HttpUrl, string.Join('\n', Lines));
         }
 
         private void CloseClient()

@@ -64,11 +64,11 @@ namespace MantoProxy
         {
             TcpClient client = TcpListener.AcceptTcpClient();
 
-            var workerThread = new Thread(async () =>
+            var workerThread = new Thread(() =>
             {
                 var watch = Stopwatch.StartNew();
                 RequestsTotal.Add(1);
-                await ConnectionHandler.Handle(client);
+                ConnectionHandler.Handle(client);
                 watch.Stop();
                 RequestsDuration.Record(watch.Elapsed.TotalMilliseconds);
             });

@@ -47,14 +47,14 @@ namespace MantoProxy.Services
 
         }
 
-        public async static void Store(string key, string value, TimeSpan? expiry = null)
+        public static void Store(string key, string value, TimeSpan? expiry = null)
         {
             if (!Configured || Database == null) return;
 
             try
             {
                 var watch = Stopwatch.StartNew();
-                await Database.StringSetAsync(key, value, expiry);
+                Database.StringSet(key, value, expiry);
                 watch.Stop();
                 Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "SET"));
             }
@@ -64,14 +64,14 @@ namespace MantoProxy.Services
             }
         }
 
-        public async static Task<string> Retrieve(string key)
+        public static string Retrieve(string key)
         {
             if (!Configured || Database == null) return String.Empty;
 
             try
             {
                 var watch = Stopwatch.StartNew();
-                var data = await Database.StringGetAsync(key);
+                var data = Database.StringGet(key);
                 watch.Stop();
                 Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "GET"));
 
