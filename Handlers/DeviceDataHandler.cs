@@ -17,7 +17,11 @@ namespace MantoProxy.Handlers
         {
             try
             {
-                if (string.IsNullOrEmpty(ip)) return null;
+                if (string.IsNullOrEmpty(ip))
+                {
+                    Application.DebugLog("IP não preenchido");
+                    return null;
+                }
 
                 var mac = RecoverMacFromIP(ip);
                 if (String.IsNullOrEmpty(mac)) return null;
@@ -56,6 +60,7 @@ namespace MantoProxy.Handlers
 
             if (String.IsNullOrEmpty(mac))
             {
+                Application.DebugLog("Mac não encontrado no Cache: " + ip);
                 var watch = Stopwatch.StartNew();
                 var process = new Process
                 {
@@ -73,6 +78,7 @@ namespace MantoProxy.Handlers
                 process.WaitForExit();
                 Application.CommandLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("command", "arp"));
                 string output = process.StandardOutput.ReadToEnd();
+                Application.DebugLog($"{ip} - {output}");
 
                 mac = GetMacFromARPOutput(output, ip);
                 if (!String.IsNullOrEmpty(mac))
@@ -87,11 +93,13 @@ namespace MantoProxy.Handlers
             string json = TryFromCache(DataFromMacCachePrefix + mac);
             if (!String.IsNullOrEmpty(json))
             {
+                Application.DebugLog("Dispositivo encontrado no cache: " + json);
                 var jsonData = JsonSerializer.Deserialize<DeviceData>(json);
                 return jsonData;
             }
 
             var data = DeviceDataService.GetDeviceDataFromMac(mac);
+            Application.DebugLog("Dispostivo não encontrado no Cache, pego do banco de dados: " + data?.ToString());
             if (data != null) StoreInCache(DataFromMacCachePrefix + mac, JsonSerializer.Serialize(data));
             return data;
         }

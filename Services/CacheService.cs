@@ -55,11 +55,13 @@ namespace MantoProxy.Services
             {
                 var watch = Stopwatch.StartNew();
                 Database.StringSet(key, value, expiry);
+                Application.DebugLog($"Salvo {key} no cache como: {value} e expirando em {expiry}");
                 watch.Stop();
                 Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "SET"));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Application.DebugLog($"Erro ao salvar {key} no cache como: {value} por: " + ex);
                 return;
             }
         }
@@ -73,14 +75,16 @@ namespace MantoProxy.Services
                 var watch = Stopwatch.StartNew();
                 var data = Database.StringGet(key);
                 watch.Stop();
+                Application.DebugLog($"Recuperado {key} do cache!");
                 Application.CacheLatency.Record(watch.Elapsed.TotalMilliseconds, KeyValuePair.Create<string, object?>("operation", "GET"));
 
                 if (String.IsNullOrEmpty(data)) return String.Empty;
 
                 return data.ToString();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Application.DebugLog($"Erro ao recuperar {key} do cache: " + ex);
                 return String.Empty;
             }
         }

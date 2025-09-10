@@ -11,9 +11,15 @@ namespace MantoProxy.Database
 
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-            => optionsBuilder
+        {
+            optionsBuilder
                 .UseNpgsql("Host=127.0.0.1;Database=manto_proxy;Username=postgres;Password=admin")
                 .UseSnakeCaseNamingConvention();
+
+            if (Application.DEBUG_MODE)
+                optionsBuilder.LogTo(Console.WriteLine);
+        }
+
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

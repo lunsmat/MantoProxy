@@ -16,7 +16,7 @@ namespace MantoProxy.Handlers
 {
     class ConnectionHandler
     {
-        private bool AuthenticationEnabled = false;
+        private readonly bool AuthenticationEnabled = false;
 
         private readonly TcpClient Client;
 
@@ -62,6 +62,7 @@ namespace MantoProxy.Handlers
             var data = DeviceDataHandler.FromIP(ip);
             if (data == null)
             {
+                Application.DebugLog("Não encontrado dados do dispositivo com ip: " + ip);
                 Application.Requests.Add(
                     1,
                     KeyValuePair.Create<string, object?>("Requests", "Failed"),
@@ -80,6 +81,7 @@ namespace MantoProxy.Handlers
             }
             catch (SocketException ex)
             {
+                Application.DebugLog("SocketError no Handle: " + ex.Message);
                 switch (ex.SocketErrorCode)
                 {
                     case SocketError.HostNotFound:
@@ -133,12 +135,14 @@ namespace MantoProxy.Handlers
             {
                 if (string.IsNullOrEmpty(AuthHeader))
                 {
+                    Application.DebugLog("Não permitido acesso por falta de cabeçalho de autenticação!");
                     SendResponse(ResponseCodes.ProxyAuthenticationRequired);
                     return false;
                 }
 
                 if (!AuthHandler.HasPermission(AuthHeader))
                 {
+                    Application.DebugLog("Não permitido acesso por falta de permissão de autenticação!");
                     SendResponse(ResponseCodes.ProxyAuthenticationRequired);
                     return false;
                 }
@@ -146,18 +150,21 @@ namespace MantoProxy.Handlers
 
             if (string.IsNullOrEmpty(FirstLine))
             {
+                Application.DebugLog("Não permitido acesso por primeira linha nula");
                 SendResponse(ResponseCodes.ImATeapot);
                 return false;
             }
 
             if (!Device.AllowConnection)
             {
+                Application.DebugLog("Não permitido acesso por não dispositivo não ter acesso a conexão!");
                 SendResponse(ResponseCodes.PreconditionRequired);
                 return false;
             }
 
             if (Device.FiltersList.Any(f => f.Contains(HttpUrl)))
             {
+                Application.DebugLog("Não permitido acesso por url ser bloqueada");
                 SendResponse(ResponseCodes.NotAcceptable);
                 return false;
             }
@@ -192,6 +199,7 @@ namespace MantoProxy.Handlers
 
             if (string.IsNullOrEmpty(host))
             {
+                Application.DebugLog("Host é null ou vazio: " + host);
                 SendResponse(ResponseCodes.ImATeapot);
                 return;
             }
@@ -214,9 +222,7 @@ namespace MantoProxy.Handlers
             byte[] requestBytes = Encoding.ASCII.GetBytes(requestBuilder.ToString() + "\r\n");
             serverStream.Write(requestBytes);
 
-            var thread = new Thread(() => Relay(serverStream, Stream));
-            thread.Start();
-            thread.Join();
+            Relay(serverStream, Stream);
             CloseClient();
             Application.Requests.Add(1, KeyValuePair.Create<string, object?>("Requests", "Succeeded"));
 
@@ -234,6 +240,7 @@ namespace MantoProxy.Handlers
                 var addresses = Dns.GetHostAddresses(host);
                 if (addresses.Length == 0)
                 {
+                    Application.DebugLog("Nenhum DNS para o Host: " + host);
                     SendResponse(ResponseCodes.BadGateway);
                     return;
                 }
@@ -276,8 +283,9 @@ namespace MantoProxy.Handlers
                     output.Write(buffer, 0, bytesRead);
                 }
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+                Application.DebugLog("IOException: " + ex.Message);
             }
             catch (Exception ex)
             {

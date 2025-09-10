@@ -8,8 +8,26 @@ namespace MantoProxy
 
         private static readonly Application APP = new(IPAddress.Any, ListenPort);
 
-        public static void Main()
+        private const string DebugFlag = "--debug";
+
+        public static void Main(string[] args)
         {
+            if (args.Length > 0)
+            {
+                foreach (string arg in args)
+                {
+                    switch (arg)
+                    {
+                        case DebugFlag:
+                            Application.SetDebugMode(true);
+                            Console.WriteLine("Inicializando com o modo de debug!");
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
             APP.Start();
         }
 

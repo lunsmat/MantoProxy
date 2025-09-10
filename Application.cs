@@ -11,6 +11,8 @@ namespace MantoProxy
 {
     class Application
     {
+        public static bool DEBUG_MODE = false;
+
         private readonly IPAddress IPAddress;
 
         private readonly int ListenPort;
@@ -67,12 +69,26 @@ namespace MantoProxy
             var workerThread = new Thread(() =>
             {
                 var watch = Stopwatch.StartNew();
+                DebugLog("Recebida Requisição do client: " + client.ToString());
                 RequestsTotal.Add(1);
                 ConnectionHandler.Handle(client);
                 watch.Stop();
+                DebugLog("Finalizada Requisição do client: " + client.ToString());
                 RequestsDuration.Record(watch.Elapsed.TotalMilliseconds);
             });
             workerThread.Start();
+        }
+
+        public static void SetDebugMode(bool debugMode)
+        {
+            DEBUG_MODE = debugMode;
+        }
+
+        public static void DebugLog(string message)
+        {
+            if (!DEBUG_MODE) return;
+
+            Console.WriteLine($"Debug: " + message);
         }
     }
 }
