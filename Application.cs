@@ -35,7 +35,7 @@ namespace MantoProxy
 
         public static Histogram<double> CacheLatency = Meters.CreateHistogram<double>(name: "MantoProxy.CacheLatency", unit: "ms");
 
-        public static Histogram<double> DatabaseLatency = Meters.CreateHistogram<double>(name: "MantoProxy.DatabaseLatency", unit: " ms");
+        public static Histogram<double> DatabaseLatency = Meters.CreateHistogram<double>(name: "MantoProxy.DatabaseLatency", unit: "ms");
 
         public Application(IPAddress iPAddress, int port)
         {
