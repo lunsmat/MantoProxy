@@ -162,11 +162,14 @@ namespace MantoProxy.Handlers
                 return false;
             }
 
-            if (Device.FiltersList.Any(f => f.Contains(HttpUrl)))
+            foreach (var filter in Device.FiltersList)
             {
-                Application.DebugLog("Não permitido acesso por url ser bloqueada");
-                SendResponse(ResponseCodes.NotAcceptable);
-                return false;
+                if (HttpUrl.Contains(filter))
+                {
+                    Application.DebugLog("Não permitido acesso por url ser bloqueada");
+                    SendResponse(ResponseCodes.NotAcceptable);
+                    return false;
+                }
             }
 
             return true;

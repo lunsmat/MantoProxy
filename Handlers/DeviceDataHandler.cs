@@ -17,6 +17,7 @@ namespace MantoProxy.Handlers
         {
             try
             {
+                new Ping().Send(ip, 100);
                 if (string.IsNullOrEmpty(ip))
                 {
                     Application.DebugLog("IP não preenchido");
