@@ -17,7 +17,6 @@ namespace MantoProxy.Handlers
         {
             try
             {
-                new Ping().Send(ip, 100);
                 if (string.IsNullOrEmpty(ip))
                 {
                     Application.DebugLog("IP não preenchido");
@@ -62,6 +61,7 @@ namespace MantoProxy.Handlers
             if (String.IsNullOrEmpty(mac))
             {
                 Application.DebugLog("Mac não encontrado no Cache: " + ip);
+                new Ping().Send(ip, 100);
                 var watch = Stopwatch.StartNew();
                 var process = new Process
                 {
