@@ -28,6 +28,14 @@ namespace MantoProxy.Database
                 entity.HasNoKey();
                 entity.ToView("device_data");
             });
+
+            builder.Entity<DeviceLog>()
+                .Property(entity => entity.CreatedAt)
+                .HasColumnType("timestamp without time zone");
+
+            builder.Entity<DeviceLog>()
+                .Property(entity => entity.UpdatedAt)
+                .HasColumnType("timestamp without time zone");
         }
     }
 }
